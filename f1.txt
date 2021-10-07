@@ -1,0 +1,106 @@
+Stir/Shaken Build
+
+apt update && apt upgrade
+apt install sngrep build-essential bison flex git zip ntp monit libmemcached-dev iotop socat libpcre3-dev libjson-c-dev libncurses5-dev libssl-dev pkg-config libmysqlclient-dev memcached zlib1g-dev net-tools autoconf mysql-server libmicrohttpd-dev
+cd /usr/local/src/
+git clone https://github.com/OpenSIPS/opensips.git -b 3.1 opensips-3.1
+cd opensips-3.1/
+make menuconfig
+cd packaging/debian/
+cp opensips.init /etc/init.d/opensips
+vi /etc/init.d/opensips (change file)
+cp opensips.default /etc/default/opensips
+vi /etc/default/opensips (change file)
+chmod +x /etc/init.d/opensips
+apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 049AD65B
+echo "deb https://apt.opensips.org focal cli-nightly" >/etc/apt/sources.list.d/opensips-cli.list
+apt update
+apt install opensips-cli
+adduser opensips --disabled-login
+
+cd /usr/share/
+ln -s /usr/local/share/opensips opensips
+
+	vi /root/opensips-cli.cfg
+[default]
+log_level: WARNING
+prompt_name: opensips-cli
+prompt_intro: Welcome to OpenSIPS Command Line Interface!
+prompt_emptyline_repeat_cmd: False
+history_file: ~/.opensips-cli.history
+history_file_size: 1000
+output_type: pretty-print
+communication_type: fifo
+fifo_file: /tmp/opensips_fifo
+database_path: /usr/local/src/opensips-3.1/scripts/mysql
+
+
+mkdir -p /home/mtindall/projects/
+cd /home/mtindall/projects/
+git clone https://Kashif_1@bitbucket.org/skunkworx/stir-shaken-proxy.git (https)
+git clone git@bitbucket.org:skunkworx/stir-shaken-proxy.git (ssh)
+
+
+
+cd /usr/local/etc/opensips/
+mv opensips.cfg opensips.cfg.orig
+ln -s /home/mtindall/projects/stir-shaken-proxy/opensips.cfg opensips.cfg
+
+
+vi environment.cfg
+/* uncomment the following lines to enable debugging */
+#debug_mode=yes
+
+log_level=3
+xlog_level=3
+log_stderror=no
+log_facility=LOG_LOCAL0
+
+udp_workers=4
+
+/* uncomment the next line to enable the auto temporary blacklisting of
+ *    not available destinations (default disabled) */
+disable_dns_blacklist=no
+
+/* uncomment the next line to enable IPv6 lookup after IPv4 dns
+ *    lookup failures (default disabled) */
+#dns_try_ipv6=yes
+
+
+socket=udp:192.81.236.199:5060   # CUSTOMIZE ME
+
+
+
+touch /var/log/opensips.log
+chown syslog.adm opensips.log
+vi /etc/logrotate.d/opensips (change log rotation)
+	vi /etc/rsyslog.d/50-default.conf
+local0.*                                        -/var/log/opensips.log
+auth,authpriv.*                                  /var/log/auth.log
+*.*;auth,authpriv.none,local0.none              -/var/log/syslog
+
+
+
+
+opensips-cli -x database create
+
+runuser -l opensips -c 'opensips-cli'
+
+create user 'mtindall'@'localhost' identified by 'bobmaloogaloogaloogaloogalooga';
+grant all privileges on *.* to 'mtindall'@'localhost';
+
+/etc/init.d/rsyslog restart
+/etc/init.d/opensips start
+systemctl enable opensips
+systemctl edit opensips.service (chnage file)
+[Unit]
+After=multi-user.target
+After=mysql.service
+
+[Install]
+WantedBy=multi-user.target
+
+/etc/init.d/rsyslog restart
+/etc/init.d/opensips start
+systemctl enable opensips
+
